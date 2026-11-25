@@ -227,7 +227,7 @@
   function setPill(text, waiting = false) {
     pill.className = 'status-pill show' + (waiting ? ' waiting' : ''); pillText.textContent = text;
   }
-  const pageBase = () => location.protocol.startsWith('http') ? new URL('.', location.href).href : 'https://example.github.io/celonis-mockup/iveco/';
+  const pageBase = () => location.protocol.startsWith('http') ? new URL('.', location.href).href : 'https://gbozzelli.github.io/iveco/';
   const actionUrl = a => `${pageBase()}action.html?t=${topic}&a=${a}`;
 
   function sendCard(card) {
