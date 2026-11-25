@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Celonis · Action</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f9fb; color: #1f2433;
+         min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .card { background: #fff; border: 1px solid #e6e8ec; border-radius: 12px; padding: 36px 40px; max-width: 520px; width: 100%; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+  .kicker { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #6b7280; margin-bottom: 18px; }
+  .icon { width: 54px; height: 54px; margin: 0 auto 14px; }
+  .icon.ok { color: #16a34a; } .icon.info { color: #1f6feb; } .icon.err { color: #dc2626; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  p { color: #4b5563; font-size: 14px; line-height: 1.5; }
+  .hint { margin-top: 18px; font-size: 12.5px; color: #9ca3af; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="kicker" id="kicker">CELONIS</div>
+  <svg class="icon info" id="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+  <h1 id="title">Processing…</h1>
+  <p id="desc"></p>
+  <div class="hint">You can close this tab and go back to Teams.</div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  const q = new URLSearchParams(location.search);
+  const topic = q.get('t'), a = q.get('a');
+  const S = DEMO.supplier.name;
+  const ACTIONS = {
+    exp_send:     ['EXPEDITING', true,  'Follow-up sent to ' + S, 'One consolidated email with the SPEED file and the form link is on its way. Celonis will wait for the answer: 24h for the VOR lines.'],
+    exp_edit:     ['EXPEDITING', false, 'Edit lines', 'This opens supplier card 4.1 with the lines pre-selected, so you can add or remove lines before sending.'],
+    exp_postpone: ['EXPEDITING', false, 'Postponed to tomorrow', 'The follow-up will be proposed again in 24 hours.'],
+    exp_call:     ['EXPEDITING', false, "You'll call " + S, 'After the call, a short form lets you enter the confirmed date and quantity.'],
+    pl_transfer:  ['PLANNING',   true,  'Transfer approved', 'A stock transfer request of 6 pcs from 1 – Torino to 2 – Lieusaint has been created. Once IVECO allows it, Celonis can write it directly into CSPS.'],
+    pl_accept:    ['PLANNING',   true,  'New date accepted', 'The branch is closed and the stock projection is updated with the new delivery date.'],
+    pl_expedite:  ['PLANNING',   true,  'Urgent expediting requested', 'A task has been created for the expediter, already assigned.'],
+    pl_open:      ['PLANNING',   false, 'Part card', 'This opens part card 3.1 with stock, demand and open orders for the part.'],
+  };
+  const PATHS = {
+    ok:   '<circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/>',
+    err:  '<circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>',
+  };
+  const show = (kind, kicker, title, desc) => {
+    const icon = document.getElementById('icon');
+    icon.setAttribute('class', 'icon ' + kind); icon.innerHTML = PATHS[kind];
+    document.getElementById('kicker').textContent = 'CELONIS · ' + kicker;
+    document.getElementById('title').textContent = title;
+    document.getElementById('desc').textContent = desc;
+  };
+
+  const def = ACTIONS[a];
+  if (!def || !topic) {
+    show('err', 'DEMO', 'Link not recognised', 'Open this link from the Teams card of a running demo.');
+  } else {
+    const [kicker, primary, title, desc] = def;
+    relayPublish(topic, { type: 'action', a })
+      .then(() => show(primary ? 'ok' : 'info', kicker, title, desc))
+      .catch(() => show('err', kicker, 'Could not reach Celonis', 'Please try the button again.'));
+  }
+</script>
+</body>
+</html>

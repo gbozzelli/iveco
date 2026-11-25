@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OE · Supplier follow-up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1f2433; background: #f8f9fb; overflow: hidden;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 10;
+    background: #fff; border-bottom: 1px solid #e6e8ec;
+    display: flex; align-items: center; gap: 12px; padding: 0 20px;
+  }
+  .title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .title small { font-weight: 400; color: #6b7280; margin-left: 8px; }
+  .spacer { flex: 1; }
+  .status-pill {
+    font-size: 13px; color: #4b5563; background: #fff;
+    border: 1px solid #e5e7eb; border-radius: 999px; padding: 7px 14px;
+    display: none; align-items: center; gap: 8px; white-space: nowrap;
+  }
+  .status-pill.show { display: inline-flex; }
+  .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #2f9e62; flex: none; }
+  .status-pill.waiting .dot { background: #f29a38; animation: pulse 1.2s infinite; }
+  .run-btn {
+    font: inherit; font-size: 14px; font-weight: 600; color: #fff;
+    background: #1f6feb; border: none; border-radius: 8px; padding: 9px 18px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 8px; flex: none;
+  }
+  .run-btn:hover { background: #1a5fd0; }
+  .run-btn:disabled { opacity: .55; cursor: default; }
+  .run-btn svg { width: 15px; height: 15px; }
+
+  /* ---------- Canvas ---------- */
+  .scroller {
+    position: absolute; top: 56px; left: 0; right: 0; bottom: 0; overflow-y: auto; overflow-x: hidden;
+    background-color: #f8f9fb;
+    background-image: radial-gradient(#d5d9e0 1.2px, transparent 1.2px);
+    background-size: 29px 29px; background-attachment: local;
+  }
+  .stage-wrap { position: relative; margin: 0 auto; }
+  .stage { position: absolute; top: 0; left: 0; width: 1400px; height: 2110px; transform-origin: top left; }
+  .wires { position: absolute; inset: 0; pointer-events: none; }
+  .wires path { fill: none; stroke: #d7dbe1; stroke-width: 1.5; }
+
+  .label {
+    position: absolute; transform: translateX(-50%);
+    font-size: 12px; letter-spacing: .06em; color: #4b5563; white-space: nowrap; transition: opacity .4s;
+  }
+  .label.sub { color: #9ca3af; font-size: 11px; }
+
+  /* ---------- Nodes ---------- */
+  .node {
+    position: absolute; width: 320px; height: 140px; background: #fff;
+    border: 1px solid #e6e8ec; border-radius: 6px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(16,24,40,.03);
+    transition: border-color .35s, box-shadow .35s, opacity .4s;
+  }
+  .hdr {
+    height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 18px;
+    background: #f4f5f7; color: #6b7280; font-size: 15px; font-weight: 500;
+    transition: background .35s, color .35s;
+  }
+  .hdr .hicon { width: 17px; height: 17px; flex: none; }
+  .hdr .step-no { font-size: 12px; color: #9ca3af; font-weight: 500; }
+  .hdr .state { margin-left: auto; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+  .hdr .state svg { width: 19px; height: 19px; display: none; }
+  .hdr .state .pdot { width: 11px; height: 11px; border-radius: 50%; background: #f29a38; display: none; animation: pulse 1.2s infinite; }
+  .body { height: 96px; display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+  .icons { display: flex; gap: 4px; flex: none; }
+  .txt .t { font-size: 15px; line-height: 1.4; color: #1f2433; }
+  .txt .m { font-size: 11.5px; color: #8a919c; margin-top: 4px; line-height: 1.35; }
+
+  .ic { width: 24px; height: 24px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; }
+  .ic-signal { width: 30px; height: 30px; border-radius: 8px; background: #eef0f3; color: #2b3140; }
+  .ic-signal svg { width: 16px; height: 16px; }
+  .ic-action { background: #1e2433; }
+  .ic-action span { width: 14px; height: 14px; border: 1.5px solid #fff; border-radius: 3px; display: flex; align-items: center; justify-content: center; }
+  .ic-action span::after { content: ""; width: 4px; height: 4px; border: 1.2px solid #fff; border-radius: 50%; }
+  .ic-teams { background: #5b5fc7; }
+  .ic-outlook { background: #0f6cbd; }
+  .ic-ai { background: linear-gradient(135deg, #7c3aed, #2563eb); }
+  .ic-ai svg, .ic-table svg, .ic-form svg { width: 14px; height: 14px; }
+  .ic-table { background: #0e7c66; }
+  .ic-form { background: #e8590c; }
+
+  .node.done { border: 2px solid #5cc489; box-shadow: 0 0 0 3px rgba(92,196,137,.12); }
+  .node.done .hdr { background: #e7f5ec; color: #2c7a4f; }
+  .node.done .state .check { display: block; }
+  .node.waiting { border: 2px solid #f2a84e; box-shadow: 0 0 0 3px rgba(242,168,78,.16); cursor: pointer; }
+  .node.waiting .hdr { background: #fff1e3; color: #c4660f; }
+  .node.waiting .state .pdot { display: block; }
+  .node.skipped, .label.skipped { opacity: .4; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="title">OE · Supplier follow-up: open POs without confirmation<small>IVECO Aftersales · EMEA</small></div>
+  <div class="spacer"></div>
+  <div class="status-pill" id="pill"><span class="dot"></span><span id="pillText"></span></div>
+  <button class="run-btn" id="runBtn">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+    <span id="btnText">Run process</span>
+  </button>
+</div>
+
+<div class="scroller" id="scroller">
+  <div class="stage-wrap" id="wrap">
+    <div class="stage" id="stage">
+      <svg class="wires" width="1400" height="2110">
+        <!-- triggers -> step 1 -->
+        <path d="M510 188 V216 H700" /><path d="M890 188 V216 H700" /><path d="M700 216 V244" />
+        <!-- main chain -->
+        <path d="M700 384 V424" /><path d="M700 564 V604" /><path d="M700 744 V784" /><path d="M700 924 V964" />
+        <!-- branch split -->
+        <path d="M700 1104 V1140" /><path d="M190 1156 V1140 H1210 V1156" /><path d="M530 1140 V1156" /><path d="M870 1140 V1156" />
+        <!-- branch 2 sub-steps -->
+        <path d="M530 1320 V1360" /><path d="M530 1500 V1540" />
+        <!-- merge -->
+        <path d="M190 1320 V1720 H1210 V1320" /><path d="M530 1680 V1720" /><path d="M870 1320 V1720" /><path d="M700 1720 V1760" />
+        <path d="M700 1900 V1940" />
+      </svg>
+      <div id="nodes"></div>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+  // ================= Config =================
+  const TEAMS_WEBHOOK = 'https://defaultb7ace95d83d7472385c7b157572080.9d.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/18/workflows/a025b6e3e5994808b35687b7456838ad/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=GfOxroR8b-CtyOj2SxJ4ceunSr6CByh7xeEWBOkOa38';
+  const STEP_DELAY = 800;
+
+  // ================= Icons =================
+  const SVG = {
+    down: '<path d="M12 5v14M5 12l7 7 7-7"/>',
+    step: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M6.5 10v4.5a2 2 0 0 0 2 2H14"/>',
+    resume: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+    end: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9"/>',
+  };
+  const svg = (p, cls = 'hicon') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const ICON = {
+    signal: `<div class="ic ic-signal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19.1 4.9a10 10 0 0 1 0 14.2M4.9 19.1a10 10 0 0 1 0-14.2"/></svg></div>`,
+    action: '<div class="ic ic-action"><span></span></div>',
+    teams: '<div class="ic ic-teams">T</div>',
+    outlook: '<div class="ic ic-outlook">O</div>',
+    form: `<div class="ic ic-form"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div>`,
+    ai: `<div class="ic ic-ai"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.2 6.3L20 10l-5.8 1.7L12 18l-2.2-6.3L4 10l5.8-1.7z"/></svg></div>`,
+    table: `<div class="ic ic-table"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M4 10h16M10 10v9"/></svg></div>`,
+  };
+  const HDR = { start: ['Start process', SVG.down], step: ['Process step', SVG.step], resume: ['Resume process', SVG.resume], end: ['End process', SVG.end] };
+
+  // ================= Nodes =================
+  // x,y = top-left on a 1400px canvas
+  const NODES = [
+    { id: 'trig-manual', type: 'start', x: 350, y: 48,  icons: ['signal'], t: 'Expediter-Follow-Up-Requested', m: 'Manual · “Start follow-up” from supplier card 4.1' },
+    { id: 'trig-auto',   type: 'start', x: 730, y: 48,  icons: ['signal'], t: 'Unconfirmed-PO-Detected', m: 'Celonis rule · no confirmation 3 working days after PO' },
+    { id: 's1', no: 1, type: 'step',   x: 540, y: 244,  icons: ['action', 'action'], t: 'Prepare follow-up package & assign priority', m: 'Knowledge Model (PQL) · Action Flow (Excel for SPEED)' },
+    { id: 's2', no: 2, type: 'step',   x: 540, y: 424,  icons: ['teams'], t: 'Send approval card to Expediter', m: 'Microsoft Teams · adaptive card' },
+    { id: 's3', no: 3, type: 'resume', x: 540, y: 604,  icons: ['signal'], t: 'Receive-Expediter-Decision', m: 'Send now · Edit lines · Postpone' },
+    { id: 's4', no: 4, type: 'step',   x: 540, y: 784,  icons: ['outlook', 'form'], t: 'Send follow-up to supplier (file + form link)', m: 'Outlook · supplier form' },
+    { id: 's5', no: 5, type: 'resume', x: 540, y: 964,  icons: ['signal', 'ai'], t: 'Receive-Supplier-Response', m: 'Max 24h High · 72h Medium · 5d Low · AI agent reads free-text email' },
+    { id: 'b1',  type: 'step',   x: 30,  y: 1180, icons: ['action'], t: 'Write date to CSPS/SPEED & close task', m: 'API / RPA if allowed, else stored in Celonis · planner notified if own request' },
+    { id: 'b2',  type: 'step',   x: 370, y: 1180, icons: ['action'], t: 'Calculate impact', m: 'VOR & urgent orders · stockout date · free stock in network' },
+    { id: 'b2a', type: 'step',   x: 370, y: 1360, icons: ['teams'], t: 'Send decision card to Planner', m: 'Microsoft Teams · adaptive card' },
+    { id: 'b2b', type: 'resume', x: 370, y: 1540, icons: ['signal'], t: 'Receive-Planner-Decision', m: 'Transfer · accept date · urgent expediting' },
+    { id: 'b3',  type: 'step',   x: 710, y: 1180, icons: ['action', 'teams'], t: 'Planner task with alternatives + VOR team alert', m: 'Other depot · substitute · other supplier' },
+    { id: 'b4',  type: 'step',   x: 1050, y: 1180, icons: ['outlook', 'teams'], t: 'Second reminder → 24h → escalation card', m: 'Call supplier or escalate to buyer · logged in supplier score' },
+    { id: 's7', no: 7, type: 'step',   x: 540, y: 1760, icons: ['table'], t: 'Update supplier reliability', m: 'Celonis table · response time, dates kept, dates moved' },
+    { id: 'end', no: 8, type: 'end',   x: 540, y: 1940, icons: ['signal'], t: 'Supplier-Follow-Up-Completed', m: '' },
+  ];
+  const LABELS = [
+    { x: 510, y: 24, t: 'MANUAL · EXPEDITER' }, { x: 890, y: 24, t: 'AUTOMATIC · CELONIS RULE' },
+    { x: 190, y: 1160, t: 'CONFIRMED IN TIME', id: 'l-b1' }, { x: 530, y: 1160, t: 'NEW DATE TOO LATE', id: 'l-b2' },
+    { x: 870, y: 1160, t: 'PARTIAL / CANNOT DELIVER', id: 'l-b3' }, { x: 1210, y: 1160, t: 'NO ANSWER IN TIME', id: 'l-b4' },
+  ];
+
+  const nodesEl = document.getElementById('nodes');
+  nodesEl.innerHTML =
+    LABELS.map(l => `<div class="label" ${l.id ? `id="${l.id}"` : ''} style="left:${l.x}px;top:${l.y}px">${l.t}</div>`).join('') +
+    NODES.map(n => {
+      const [h, p] = HDR[n.type];
+      return `<div class="node" id="${n.id}" style="left:${n.x}px;top:${n.y}px">
+        <div class="hdr">${svg(p)}${h}${n.no ? `<span class="step-no">#${n.no}</span>` : ''}
+          <span class="state">${svg(SVG.end, 'check')}<span class="pdot"></span></span></div>
+        <div class="body"><div class="icons">${n.icons.map(i => ICON[i]).join('')}</div>
+          <div class="txt"><div class="t">${n.t}</div>${n.m ? `<div class="m">${n.m}</div>` : ''}</div></div>
+      </div>`;
+    }).join('');
+
+  // ================= Scale to iframe width =================
+  const stage = document.getElementById('stage'), wrap = document.getElementById('wrap'), scroller = document.getElementById('scroller');
+  function fit() {
+    const s = Math.min(scroller.clientWidth / 1400, 1.1);
+    stage.style.transform = `scale(${s})`;
+    wrap.style.width = (1400 * s) + 'px'; wrap.style.height = (2110 * s + 20) + 'px';
+    stage.dataset.scale = s;
+  }
+  window.addEventListener('resize', fit); fit();
+
+  // ================= Helpers =================
+  const $ = id => document.getElementById(id);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btn = $('runBtn'), btnText = $('btnText'), pill = $('pill'), pillText = $('pillText');
+
+  function setNode(id, cls) {
+    const n = $(id); n.classList.remove('done', 'waiting', 'skipped'); if (cls) n.classList.add(cls);
+    if (cls === 'done' || cls === 'waiting') focusNode(n);
+  }
+  function focusNode(n) {
+    const s = +stage.dataset.scale;
+    const y = (parseFloat(n.style.top) + 70) * s - scroller.clientHeight / 2;
+    scroller.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+  }
+  function setPill(text, waiting = false) {
+    pill.className = 'status-pill show' + (waiting ? ' waiting' : ''); pillText.textContent = text;
+  }
+  const pageBase = () => location.protocol.startsWith('http') ? new URL('.', location.href).href : 'https://example.github.io/celonis-mockup/iveco/';
+  const actionUrl = a => `${pageBase()}action.html?t=${topic}&a=${a}`;
+
+  function sendCard(card) {
+    return fetch(TEAMS_WEBHOOK, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'message', attachments: [{ contentType: 'application/vnd.microsoft.card.adaptive', contentUrl: null, content: card }] }),
+    }).catch(err => console.warn('Teams card failed', err));
+  }
+
+  // ================= Teams cards =================
+  const tb = (text, o = {}) => ({ type: 'TextBlock', text, wrap: true, ...o });
+  const head = (kicker, title, color = 'Default') => [
+    tb(kicker, { size: 'Small', isSubtle: true, weight: 'Bolder' }),
+    tb(title, { size: 'Large', weight: 'Bolder', color, spacing: 'Small' }),
+  ];
+  const section = t => tb(t, { weight: 'Bolder', size: 'Medium', spacing: 'Large', separator: true });
+  const facts = arr => ({ type: 'FactSet', facts: arr.map(([title, value]) => ({ title, value })) });
+  const reco = (main, sub) => ({ type: 'Container', style: 'emphasis', items: [tb(main, { weight: 'Bolder' }), ...(sub ? [tb(sub, { isSubtle: true, spacing: 'Small' })] : [])] });
+  const card = (body, actions) => ({ $schema: 'http://adaptivecards.io/schemas/adaptive-card.json', type: 'AdaptiveCard', version: '1.4', msteams: { width: 'Full' }, body, actions });
+  const open = (title, a, style) => ({ type: 'Action.OpenUrl', title, url: actionUrl(a), ...(style ? { style } : {}) });
+
+  function cardExpediter() {
+    const S = DEMO.supplier;
+    return card([
+      ...head('CELONIS · EXPEDITING', `Follow-up ready: ${S.id} – ${S.name}`),
+      tb(`Hi ${DEMO.expediter}, **9 open PO lines** from this supplier have no confirmation. **3 of them block VOR orders.**`, { spacing: 'Small' }),
+      section('Supplier'),
+      facts([['Gravity score', '87 / 100 (rank #2)'], ['Lines without confirm', '9 (oldest: 18 days)'], ['Late value', '€42.3K'], ['Planner requests', '2 (assigned to you)']]),
+      section('Top lines by urgency'),
+      tb('**503133035 REAR MIRROR** · blocks 19 VOR · 264 days late · planner request', { spacing: 'Small' }),
+      tb('**5801779427 REAR MIRROR L** · blocks 16 VOR · 313 days late', { spacing: 'Small' }),
+      tb('**500615782 SUPPORT ARM** · 12 urgent · not confirmed', { spacing: 'Small' }),
+      section('Recommendation'),
+      reco('Send one consolidated reminder with the SPEED file', 'Ask for an answer within 24h on the 3 VOR lines and to ship them together.'),
+    ], [
+      open('Send now', 'exp_send', 'positive'), open('Edit lines', 'exp_edit'), open('Postpone to tomorrow', 'exp_postpone'), open("I'll call them", 'exp_call'),
+    ]);
+  }
+
+  function cardSupplierEmail() {
+    const S = DEMO.supplier;
+    return card([
+      ...head('OUTLOOK · EMAIL TO SUPPLIER (SIMULATED)', 'Order confirmation request – 9 open PO lines'),
+      facts([['From', 'IVECO Aftersales Expediting'], ['To', `${S.name} <${S.email}>`], ['Attachment', `SPEED_followup_${S.id}_${new Date().toISOString().slice(0, 10)}.xlsx`]]),
+      tb(`Dear ${S.name} team,`, { spacing: 'Medium' }),
+      tb('the 9 purchase order lines in the attached file are still **not confirmed**. Three of them (503133035, 5801779427, 500615782) are blocking vehicles off road at our dealers: **please answer within 24 hours** and, if possible, ship them together.'),
+      tb('For each line, please confirm the date, propose a new date, or tell us about a partial delivery using the form below.'),
+      tb('Kind regards, IVECO Aftersales Expediting', { isSubtle: true }),
+    ], [
+      { type: 'Action.OpenUrl', title: 'Open supplier form', style: 'positive', url: `${pageBase()}supplier.html?t=${topic}` },
+    ]);
+  }
+
+  function cardPlanner(line, newDate) {
+    const daysOut = Math.max(0, daysBetween(line.stockout, newDate));
+    const hasFree = !!line.freeQty;
+    const depotCity = line.depot.split('– ')[1] || line.depot;
+    return card([
+      ...head('CELONIS · PLANNING', `Supplier answer: new date too late – ${line.part} ${line.desc}`, 'Attention'),
+      tb(`${DEMO.supplier.name} moved the delivery from **${fmtDate(line.requested, false)}** to **${fmtDate(newDate, false)}**.`, { spacing: 'Small' }),
+      tb(`Depot ${line.depot} runs out on **${fmtDate(line.stockout, false)}**.`, { spacing: 'Small' }),
+      section('Impact'),
+      facts([
+        ['Waiting today', `${line.vor} VOR · ${line.urgent} urgent`],
+        ['Days without stock', `~${daysOut}`],
+        ['Free stock in network', hasFree ? `${line.freeQty} pcs in ${line.freeFrom} (above safety stock)` : 'none'],
+      ]),
+      section('Recommendation'),
+      hasFree
+        ? reco(`Transfer ${line.freeQty} pcs from ${line.freeFrom.split('– ')[1]} to ${depotCity} now`, 'Keep the PO on the new date.')
+        : reco('Ask urgent expediting to the supplier', 'No free stock available in the network.'),
+    ], [
+      open('Approve transfer', 'pl_transfer', 'positive'), open('Accept new date', 'pl_accept'), open('Ask urgent expediting', 'pl_expedite'), open('Open part card', 'pl_open'),
+    ]);
+  }
+
+  // ================= Flow logic =================
+  let phase = 'idle', topic = null, es = null;
+
+  function resetAll() {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('done', 'waiting', 'skipped'));
+    document.querySelectorAll('.label').forEach(l => l.classList.remove('skipped'));
+    pill.className = 'status-pill'; btnText.textContent = 'Run process'; phase = 'idle';
+    if (es) { es.close(); es = null; }
+    scroller.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function run() {
+    phase = 'busy'; btn.disabled = true;
+    topic = 'celonis-iveco-oe-' + Math.random().toString(36).slice(2, 12);
+    es = relaySubscribe(topic, onEvent);
+    sendCard(cardExpediter());                 // card goes out on click
+    setPill('Follow-up requested by expediter');
+    await sleep(300);  setNode('trig-manual', 'done');
+    await sleep(STEP_DELAY); setNode('s1', 'done'); setPill('Package prepared · priority High (blocks VOR)');
+    await sleep(STEP_DELAY); setNode('s2', 'done'); setPill('Approval card sent to expediter');
+    await sleep(STEP_DELAY); setNode('s3', 'waiting'); setPill('Waiting for expediter decision', true);
+    phase = 'expediter';
+  }
+
+  async function afterExpediter() {
+    phase = 'busy';
+    sendCard(cardSupplierEmail());
+    setNode('s3', 'done'); setPill('Expediter: Send now');
+    await sleep(STEP_DELAY); setNode('s4', 'done'); setPill('Follow-up email sent to ACME');
+    await sleep(STEP_DELAY); setNode('s5', 'waiting'); setPill('Waiting for supplier response', true);
+    phase = 'supplier';
+  }
+
+  function decideBranch(answer) {
+    const lines = DEMO.lines.map(l => ({ ...l, ans: answer[`${l.po}/${l.item}`] || { response: 'confirm' } }));
+    const late = lines.find(l => l.ans.response === 'newdate' && l.ans.date && l.ans.date > l.need);
+    if (late) return { branch: 'b2', line: late, date: late.ans.date };
+    if (lines.some(l => l.ans.response === 'partial' || l.ans.response === 'cannot')) return { branch: 'b3' };
+    return { branch: 'b1' };
+  }
+
+  async function afterSupplier(answer) {
+    phase = 'busy';
+    const d = decideBranch(answer);
+    if (d.branch === 'b2') sendCard(cardPlanner(d.line, d.date));   // card goes out as soon as the answer lands
+    setNode('s5', 'done'); setPill('Supplier response received');
+    await sleep(STEP_DELAY);
+    ['b1', 'b2', 'b3', 'b4'].filter(b => b !== d.branch).forEach(b => {
+      $(b).classList.add('skipped'); $('l-' + b).classList.add('skipped');
+      if (b === 'b2') { $('b2a').classList.add('skipped'); $('b2b').classList.add('skipped'); }
+    });
+    setNode(d.branch, 'done');
+    if (d.branch === 'b2') {
+      setPill(`New date too late for ${d.line.part}: impact calculated`);
+      await sleep(STEP_DELAY); setNode('b2a', 'done'); setPill('Decision card sent to planner');
+      await sleep(STEP_DELAY); setNode('b2b', 'waiting'); setPill('Waiting for planner decision', true);
+      phase = 'planner';
+    } else {
+      setPill(d.branch === 'b1' ? 'All lines confirmed in time' : 'Partial / cannot deliver: planner task created');
+      await finishTail();
+    }
+  }
+
+  async function afterPlanner(a) {
+    phase = 'busy';
+    setNode('b2b', 'done');
+    setPill({ pl_transfer: 'Planner: transfer approved', pl_accept: 'Planner: new date accepted', pl_expedite: 'Planner: urgent expediting requested' }[a]);
+    await finishTail();
+  }
+
+  async function finishTail() {
+    await sleep(STEP_DELAY); setNode('s7', 'done'); setPill('Supplier reliability updated');
+    await sleep(STEP_DELAY); setNode('end', 'done'); setPill('Supplier follow-up completed');
+    phase = 'done'; btn.disabled = false; btnText.textContent = 'Reset';
+  }
+
+  const INFO = {
+    exp_edit: 'Expediter: Edit lines (opens supplier card 4.1)',
+    exp_postpone: 'Expediter: postponed by 24h',
+    exp_call: 'Expediter will call the supplier',
+    pl_open: 'Planner opened part card 3.1',
+  };
+
+  function onEvent(ev) {
+    if (phase === 'expediter' && ev.type === 'action') {
+      if (ev.a === 'exp_send') afterExpediter();
+      else if (INFO[ev.a]) setPill(INFO[ev.a] + ' · still waiting', true);
+    } else if (phase === 'supplier' && ev.type === 'supplier') {
+      afterSupplier(ev.answer || {});
+    } else if (phase === 'planner' && ev.type === 'action') {
+      if (['pl_transfer', 'pl_accept', 'pl_expedite'].includes(ev.a)) afterPlanner(ev.a);
+      else if (INFO[ev.a]) setPill(INFO[ev.a] + ' · still waiting', true);
+    }
+  }
+
+  // Presenter fallback: clicking an orange (waiting) step resolves it with the demo default
+  $('s3').addEventListener('click', () => phase === 'expediter' && onEvent({ type: 'action', a: 'exp_send' }));
+  $('s5').addEventListener('click', () => phase === 'supplier' && onEvent({ type: 'supplier', answer: DEMO.defaultAnswer }));
+  $('b2b').addEventListener('click', () => phase === 'planner' && onEvent({ type: 'action', a: 'pl_transfer' }));
+
+  btn.addEventListener('click', () => {
+    if (phase === 'idle') run();
+    else if (phase === 'done') resetAll();
+  });
+</script>
+</body>
+</html>
